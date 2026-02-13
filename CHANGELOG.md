@@ -1,5 +1,33 @@
 # CHANGELOG - AI士業エリア分析
 
+## v2.1 (2026-02-13)
+
+### レスポンシブ対応 — スマホ横スクロール完全排除
+
+#### 比較テーブルのモバイル対応
+- `buildComparisonTable()`: PC用テーブル（`.comparison-table-pc`）とスマホ用カード（`.comparison-cards-sp`）のデュアルレンダリング方式に書き換え
+- CSSメディアクエリで768px以下はカード表示、以上はテーブル表示に自動切替
+
+#### インラインスタイルのCSS化
+- チャートコンテナ: インライン `height:220px` → `.chart-box` / `.chart-canvas-wrap` CSSクラスに移行
+- 5次元バーの `min-width`: 110px → 80px に縮小
+- 全国比較バーの `min-width`: 50px → 40px に縮小
+- ランキングカード: `flex-wrap: wrap` + `text-overflow: ellipsis` 追加
+- エリアタブボタン: `white-space: nowrap` 削除
+- モーダルボタン: `width: 100%` 対応
+
+#### CSS レスポンシブ強化（style.css）
+- `@media (max-width: 768px)`: 28ルール追加（テーブル↔カード切替、チャートグリッド1列化、フォントサイズ・パディング全体縮小）
+- `@media (max-width: 480px)`: 14ルール追加（stat-grid 2列化、さらに小さいフォント、dim-bar-label min-width上書き）
+- `.data-table`: `table-layout: fixed` + `word-break: break-word` で列幅固定・文字折返し
+- `.stat-box`, `.result-card__body`: `overflow: hidden` でコンテンツはみ出し防止
+- `.modal__content`: `max-height: 90vh; overflow-y: auto` でモーダルスクロール対応
+
+#### バージョン更新
+- `app.js` / `index.html` / `style.css`: v2.0→v2.1
+
+---
+
 ## v2.0 (2026-02-13)
 
 ### 大幅ブラッシュアップ — グラフ充実・全国比較・AI深掘り

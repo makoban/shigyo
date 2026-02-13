@@ -1,5 +1,5 @@
 // ========================================
-// AI士業エリア分析 v2.0 — 士業特化版
+// AI士業エリア分析 v2.1 — 士業特化版
 // Cloudflare Workers Proxy経由でGemini API + e-Stat API
 // URL入力 + エリア名入力（都道府県・市区町村）対応
 // ========================================
@@ -415,7 +415,7 @@ function showAreaSelectModal(candidates, inputText) {
   listEl.innerHTML = '';
   candidates.slice(0, 20).forEach(function(area) {
     var btn = document.createElement('button');
-    btn.style.cssText = 'display:flex; align-items:center; gap:10px; padding:14px 18px; border:1px solid rgba(139,92,246,0.3); border-radius:12px; background:rgba(30,41,59,0.6); color:#fff; cursor:pointer; font-size:14px; transition:all 0.2s; text-align:left;';
+    btn.style.cssText = 'display:flex; align-items:center; gap:8px; padding:12px 14px; border:1px solid rgba(139,92,246,0.3); border-radius:12px; background:rgba(30,41,59,0.6); color:#fff; cursor:pointer; font-size:13px; transition:all 0.2s; text-align:left; width:100%; box-sizing:border-box;';
     btn.innerHTML = '<span style="font-size:20px;">📍</span><div><div style="font-weight:700;">' + escapeHtml(area.fullLabel) + '</div><div style="font-size:11px; color:var(--text-muted);">' + (area.type === 'prefecture' ? '都道府県' : '市区町村') + '</div></div>';
     btn.addEventListener('mouseover', function() { btn.style.borderColor = 'rgba(139,92,246,0.6)'; btn.style.background = 'rgba(139,92,246,0.1)'; });
     btn.addEventListener('mouseout', function() { btn.style.borderColor = 'rgba(139,92,246,0.3)'; btn.style.background = 'rgba(30,41,59,0.6)'; });
@@ -939,14 +939,11 @@ function parseJSON(text) {
   }
 }
 
-// ---- 比較テーブル ----
+// ---- 比較テーブル（PC: テーブル / モバイル: カード） ----
 function buildComparisonTable(markets) {
   if (!markets || markets.length === 0) return '';
-  var html = '<div style="overflow-x:auto; margin-bottom:20px;"><table class="data-table" style="font-size:11px; width:100%; min-width:1000px;">' +
-    '<thead><tr style="background:rgba(139,92,246,0.1);">' +
-    '<th style="text-align:left;">エリア</th><th>人口(人)</th><th>事業所数</th><th>法人数</th><th>個人事業主</th><th>開業率(%)</th><th>廃業率(%)</th><th>士業事務所数</th><th>潜在顧客/士業</th>' +
-    '</tr></thead><tbody>';
   var totPop=0, totEst=0, totCorp=0, totSole=0, totOpen=0, totClose=0, totShigyo=0, totPot=0, cnt=0;
+  var rows = [];
   markets.forEach(function(mkt) {
     var d = mkt.data || {};
     var pop = (d.population || {}).total_population || 0;
@@ -960,27 +957,42 @@ function buildComparisonTable(markets) {
     totPop+=pop; totEst+=est; totCorp+=corp; totSole+=sole; totOpen+=openRate; totClose+=closeRate; totShigyo+=shigyoTotal; totPot+=potPerShigyo; cnt++;
     var icon = (mkt.area && mkt.area.isHQ) ? '🏢' : '📍';
     var label = mkt.area ? mkt.area.label : 'エリア';
-    html += '<tr><td style="font-weight:600; white-space:nowrap;">' + icon + ' ' + escapeHtml(label) + '</td>' +
-      '<td style="text-align:right;">' + formatNumber(pop) + '</td>' +
-      '<td style="text-align:right;">' + formatNumber(est) + '</td>' +
-      '<td style="text-align:right;">' + formatNumber(corp) + '</td>' +
-      '<td style="text-align:right;">' + formatNumber(sole) + '</td>' +
-      '<td style="text-align:right;">' + openRate + '%</td>' +
-      '<td style="text-align:right;">' + closeRate + '%</td>' +
-      '<td style="text-align:right;">' + formatNumber(shigyoTotal) + '</td>' +
-      '<td style="text-align:right;">' + formatNumber(potPerShigyo) + '</td></tr>';
+    rows.push({ icon:icon, label:label, pop:pop, est:est, corp:corp, sole:sole, openRate:openRate, closeRate:closeRate, shigyoTotal:shigyoTotal, potPerShigyo:potPerShigyo });
   });
   var n = cnt || 1;
+  // PC用テーブル
+  var html = '<div class="comparison-table-pc" style="margin-bottom:20px;"><table class="data-table" style="font-size:11px; width:100%;">' +
+    '<thead><tr style="background:rgba(139,92,246,0.1);">' +
+    '<th style="text-align:left;">エリア</th><th>人口</th><th>事業所</th><th>法人</th><th>個人</th><th>開業率</th><th>廃業率</th><th>士業数</th><th>潜在顧客</th>' +
+    '</tr></thead><tbody>';
+  rows.forEach(function(r) {
+    html += '<tr><td style="font-weight:600;">' + r.icon + ' ' + escapeHtml(r.label) + '</td>' +
+      '<td style="text-align:right;">' + formatNumber(r.pop) + '</td><td style="text-align:right;">' + formatNumber(r.est) + '</td>' +
+      '<td style="text-align:right;">' + formatNumber(r.corp) + '</td><td style="text-align:right;">' + formatNumber(r.sole) + '</td>' +
+      '<td style="text-align:right;">' + r.openRate + '%</td><td style="text-align:right;">' + r.closeRate + '%</td>' +
+      '<td style="text-align:right;">' + formatNumber(r.shigyoTotal) + '</td><td style="text-align:right;">' + formatNumber(r.potPerShigyo) + '</td></tr>';
+  });
   html += '<tr style="background:rgba(16,185,129,0.08); font-weight:700;"><td>平均</td>' +
-    '<td style="text-align:right;">' + formatNumber(Math.round(totPop/n)) + '</td>' +
-    '<td style="text-align:right;">' + formatNumber(Math.round(totEst/n)) + '</td>' +
-    '<td style="text-align:right;">' + formatNumber(Math.round(totCorp/n)) + '</td>' +
-    '<td style="text-align:right;">' + formatNumber(Math.round(totSole/n)) + '</td>' +
-    '<td style="text-align:right;">' + (totOpen/n).toFixed(1) + '%</td>' +
-    '<td style="text-align:right;">' + (totClose/n).toFixed(1) + '%</td>' +
-    '<td style="text-align:right;">' + formatNumber(Math.round(totShigyo/n)) + '</td>' +
-    '<td style="text-align:right;">' + formatNumber(Math.round(totPot/n)) + '</td></tr>';
+    '<td style="text-align:right;">' + formatNumber(Math.round(totPop/n)) + '</td><td style="text-align:right;">' + formatNumber(Math.round(totEst/n)) + '</td>' +
+    '<td style="text-align:right;">' + formatNumber(Math.round(totCorp/n)) + '</td><td style="text-align:right;">' + formatNumber(Math.round(totSole/n)) + '</td>' +
+    '<td style="text-align:right;">' + (totOpen/n).toFixed(1) + '%</td><td style="text-align:right;">' + (totClose/n).toFixed(1) + '%</td>' +
+    '<td style="text-align:right;">' + formatNumber(Math.round(totShigyo/n)) + '</td><td style="text-align:right;">' + formatNumber(Math.round(totPot/n)) + '</td></tr>';
   html += '</tbody></table></div>';
+  // モバイル用カード
+  html += '<div class="comparison-cards-sp" style="display:none; margin-bottom:20px;">';
+  rows.forEach(function(r) {
+    html += '<div style="background:rgba(30,41,59,0.4); border:1px solid rgba(139,92,246,0.1); border-radius:10px; padding:12px; margin-bottom:8px;">' +
+      '<div style="font-size:13px; font-weight:700; margin-bottom:8px;">' + r.icon + ' ' + escapeHtml(r.label) + '</div>' +
+      '<div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; font-size:11px;">' +
+      '<div style="color:var(--text-muted);">人口</div><div style="text-align:right; font-weight:600;">' + formatNumber(r.pop) + '</div>' +
+      '<div style="color:var(--text-muted);">事業所数</div><div style="text-align:right; font-weight:600;">' + formatNumber(r.est) + '</div>' +
+      '<div style="color:var(--text-muted);">法人/個人</div><div style="text-align:right; font-weight:600;">' + formatNumber(r.corp) + ' / ' + formatNumber(r.sole) + '</div>' +
+      '<div style="color:var(--text-muted);">開業率/廃業率</div><div style="text-align:right; font-weight:600;">' + r.openRate + '% / ' + r.closeRate + '%</div>' +
+      '<div style="color:var(--text-muted);">士業事務所数</div><div style="text-align:right; font-weight:600; color:#8b5cf6;">' + formatNumber(r.shigyoTotal) + '</div>' +
+      '<div style="color:var(--text-muted);">潜在顧客/士業</div><div style="text-align:right; font-weight:600; color:#10b981;">' + formatNumber(r.potPerShigyo) + '</div>' +
+      '</div></div>';
+  });
+  html += '</div>';
   return html;
 }
 
@@ -1028,8 +1040,8 @@ function buildNationalComparisonCard(marketData) {
     var badge = buildNationalComparisonBadge(areaVal, natVal, item.higherIsPositive);
     html += '<div style="margin-bottom:10px; padding:8px 12px; background:rgba(0,0,0,0.15); border-radius:8px;">' +
       '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;"><span style="font-size:11px; font-weight:600; color:var(--text-secondary);">' + item.label + badge + '</span></div>' +
-      '<div style="display:flex; align-items:center; gap:6px; margin-bottom:3px;"><span style="font-size:10px; color:var(--accent); min-width:50px;">エリア</span><div style="flex:1; background:rgba(255,255,255,0.05); border-radius:3px; height:12px; overflow:hidden;"><div style="width:' + areaPct + '%; height:100%; background:var(--accent-gradient); border-radius:3px;"></div></div><span style="font-size:11px; font-weight:700; color:var(--text-primary); min-width:48px; text-align:right;">' + areaVal + item.unit + '</span></div>' +
-      '<div style="display:flex; align-items:center; gap:6px;"><span style="font-size:10px; color:var(--text-muted); min-width:50px;">全国平均</span><div style="flex:1; background:rgba(255,255,255,0.05); border-radius:3px; height:12px; overflow:hidden;"><div style="width:' + natPct + '%; height:100%; background:rgba(148,163,184,0.4); border-radius:3px;"></div></div><span style="font-size:11px; font-weight:500; color:var(--text-muted); min-width:48px; text-align:right;">' + natVal + item.unit + '</span></div>' +
+      '<div style="display:flex; align-items:center; gap:4px; margin-bottom:3px;"><span style="font-size:9px; color:var(--accent); min-width:40px; flex-shrink:0;">エリア</span><div style="flex:1; background:rgba(255,255,255,0.05); border-radius:3px; height:10px; overflow:hidden;"><div style="width:' + areaPct + '%; height:100%; background:var(--accent-gradient); border-radius:3px;"></div></div><span style="font-size:10px; font-weight:700; color:var(--text-primary); min-width:40px; text-align:right; flex-shrink:0;">' + areaVal + item.unit + '</span></div>' +
+      '<div style="display:flex; align-items:center; gap:4px;"><span style="font-size:9px; color:var(--text-muted); min-width:40px; flex-shrink:0;">全国平均</span><div style="flex:1; background:rgba(255,255,255,0.05); border-radius:3px; height:10px; overflow:hidden;"><div style="width:' + natPct + '%; height:100%; background:rgba(148,163,184,0.4); border-radius:3px;"></div></div><span style="font-size:10px; font-weight:500; color:var(--text-muted); min-width:40px; text-align:right; flex-shrink:0;">' + natVal + item.unit + '</span></div>' +
       '</div>';
   });
   html += '</div>';
@@ -1159,18 +1171,18 @@ function renderResults(data) {
     html += '<div class="result-card" style="border:2px solid rgba(139,92,246,0.3); background:linear-gradient(135deg,rgba(139,92,246,0.05),rgba(99,102,241,0.05));"><div class="result-card__header"><div class="result-card__icon">📊</div><div><div class="result-card__title">全エリア比較サマリー</div><div class="result-card__subtitle">' + markets.length + 'エリアの横断比較 — 士業市場ダッシュボード</div></div></div><div class="result-card__body">';
     html += buildComparisonTable(markets);
 
-    html += '<div class="chart-grid"><div style="background:rgba(30,41,59,0.5); border-radius:12px; padding:16px; border:1px solid rgba(139,92,246,0.1);"><div style="font-size:13px; font-weight:700; margin-bottom:8px;">📈 事業所数 × 開業率</div><div style="position:relative; height:220px;"><canvas id="chart-est-opening"></canvas></div></div>' +
-      '<div style="background:rgba(30,41,59,0.5); border-radius:12px; padding:16px; border:1px solid rgba(139,92,246,0.1);"><div style="font-size:13px; font-weight:700; margin-bottom:8px;">📊 士業事務所数 × 潜在顧客/士業</div><div style="position:relative; height:220px;"><canvas id="chart-shigyo-potential"></canvas></div></div></div>';
+    html += '<div class="chart-grid"><div class="chart-box"><div style="font-size:13px; font-weight:700; margin-bottom:8px;">📈 事業所数 × 開業率</div><div class="chart-canvas-wrap"><canvas id="chart-est-opening"></canvas></div></div>' +
+      '<div class="chart-box"><div style="font-size:13px; font-weight:700; margin-bottom:8px;">📊 士業事務所数 × 潜在顧客/士業</div><div class="chart-canvas-wrap"><canvas id="chart-shigyo-potential"></canvas></div></div></div>';
 
     // 積み上げ棒グラフ: 開業 vs 廃業
-    html += '<div style="background:rgba(30,41,59,0.5); border-radius:12px; padding:16px; border:1px solid rgba(139,92,246,0.1); margin-bottom:20px;"><div style="font-size:13px; font-weight:700; margin-bottom:8px;">📊 開業 vs 廃業（エリア比較）</div><div style="position:relative; height:' + Math.max(180, markets.length * 50) + 'px;"><canvas id="chart-stacked-turnover"></canvas></div></div>';
+    html += '<div class="chart-box" style="margin-bottom:20px;"><div style="font-size:13px; font-weight:700; margin-bottom:8px;">📊 開業 vs 廃業（エリア比較）</div><div class="chart-canvas-wrap" style="height:' + Math.min(400, Math.max(150, markets.length * 45)) + 'px;"><canvas id="chart-stacked-turnover"></canvas></div></div>';
 
     if (cross.opportunity_ranking && cross.opportunity_ranking.length > 0) {
       html += '<div style="margin-bottom:20px;"><div style="font-size:15px; font-weight:700; margin-bottom:12px;">🏆 出店チャンスランキング</div>';
       var colors = ['#8b5cf6','#6366f1','#10b981','#f59e0b','#f97316','#3b82f6'];
       cross.opportunity_ranking.forEach(function(r, i) {
         var c = colors[i % colors.length];
-        html += '<div style="margin-bottom:10px; padding:10px 14px; background:rgba(30,41,59,0.4); border-radius:10px; border:1px solid rgba(139,92,246,0.08);"><div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;"><span style="font-size:18px; font-weight:800; color:' + c + ';">#' + (r.rank||i+1) + '</span><span style="font-size:14px; font-weight:700;">' + escapeHtml(r.area||'') + '</span><span style="margin-left:auto; font-size:20px; font-weight:800; color:' + c + ';">' + (r.score||0) + '<span style="font-size:11px; color:var(--text-muted);">点</span></span></div><div style="background:rgba(255,255,255,0.05); border-radius:6px; height:8px; overflow:hidden;"><div style="width:' + (r.score||50) + '%; height:100%; background:' + c + '; border-radius:6px;"></div></div><div style="font-size:11px; color:var(--text-secondary); margin-top:6px;">' + escapeHtml(r.reason||'') + '</div></div>';
+        html += '<div style="margin-bottom:10px; padding:10px 12px; background:rgba(30,41,59,0.4); border-radius:10px; border:1px solid rgba(139,92,246,0.08);"><div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;"><span style="font-size:16px; font-weight:800; color:' + c + ';">#' + (r.rank||i+1) + '</span><span style="font-size:13px; font-weight:700; overflow:hidden; text-overflow:ellipsis;">' + escapeHtml(r.area||'') + '</span><span style="margin-left:auto; font-size:18px; font-weight:800; color:' + c + ';">' + (r.score||0) + '<span style="font-size:10px; color:var(--text-muted);">点</span></span></div><div style="background:rgba(255,255,255,0.05); border-radius:6px; height:6px; overflow:hidden;"><div style="width:' + (r.score||50) + '%; height:100%; background:' + c + '; border-radius:6px;"></div></div><div style="font-size:10px; color:var(--text-secondary); margin-top:5px; line-height:1.5;">' + escapeHtml(r.reason||'') + '</div></div>';
       });
       html += '</div>';
     }
@@ -1199,7 +1211,7 @@ function renderResults(data) {
         dims.forEach(function(dim) {
           var val = parseInt(ac[dim]) || 0;
           var col = dimColors[dim] || '#8b5cf6';
-          html += '<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><span style="font-size:11px; color:var(--text-muted); min-width:110px; text-align:right;">' + dimLabels[dim] + '</span><div style="flex:1; background:rgba(255,255,255,0.05); border-radius:4px; height:16px; overflow:hidden; position:relative;"><div style="width:' + val + '%; height:100%; background:' + col + '; border-radius:4px; transition:width 0.5s;"></div></div><span style="font-size:12px; font-weight:700; color:' + col + '; min-width:32px; text-align:right;">' + val + '</span></div>';
+          html += '<div class="dim-bar-row" style="display:flex; align-items:center; gap:6px; margin-bottom:6px;"><span class="dim-bar-label" style="font-size:10px; color:var(--text-muted); min-width:80px; flex-shrink:0;">' + dimLabels[dim] + '</span><div style="flex:1; background:rgba(255,255,255,0.05); border-radius:4px; height:14px; overflow:hidden;"><div style="width:' + val + '%; height:100%; background:' + col + '; border-radius:4px; transition:width 0.5s;"></div></div><span style="font-size:11px; font-weight:700; color:' + col + '; min-width:28px; text-align:right; flex-shrink:0;">' + val + '</span></div>';
         });
         html += '</div>';
       });
@@ -1217,7 +1229,7 @@ function renderResults(data) {
       var isHQ = mkt.area && mkt.area.isHQ;
       var label = isHQ ? '🏢 ' + (mkt.area.label || '本所') : '📍 ' + (mkt.area.label || 'エリア' + (idx+1));
       var activeStyle = idx === 0 ? 'background:var(--accent-gradient); color:#fff; border-color:transparent;' : 'background:var(--bg-tertiary); color:var(--text-secondary); border-color:rgba(139,92,246,0.15);';
-      html += '<button class="area-tab-btn" data-area-idx="' + idx + '" onclick="switchAreaTab(' + idx + ')" style="padding:6px 14px; border-radius:20px; border:1px solid; font-size:11px; font-weight:600; cursor:pointer; transition:all 0.2s; white-space:nowrap; ' + activeStyle + '">' + escapeHtml(label) + '</button>';
+      html += '<button class="area-tab-btn" data-area-idx="' + idx + '" onclick="switchAreaTab(' + idx + ')" style="padding:5px 10px; border-radius:20px; border:1px solid; font-size:10px; font-weight:600; cursor:pointer; transition:all 0.2s; ' + activeStyle + '">' + escapeHtml(label) + '</button>';
     });
     html += '</div>';
 
@@ -1239,10 +1251,10 @@ function renderResults(data) {
       // エリア別チャート用canvas
       html += '<div style="margin-top:16px;"><div style="font-size:14px; font-weight:700; margin-bottom:10px;">📊 データ可視化</div>' +
         '<div class="chart-grid">' +
-        '<div style="background:rgba(30,41,59,0.5); border-radius:12px; padding:16px; border:1px solid rgba(139,92,246,0.1);"><div style="font-size:12px; font-weight:700; margin-bottom:6px; color:var(--accent);">事業所規模別分布</div><div style="position:relative; height:200px;"><canvas id="area-chart-' + idx + '-scale"></canvas></div></div>' +
-        '<div style="background:rgba(30,41,59,0.5); border-radius:12px; padding:16px; border:1px solid rgba(139,92,246,0.1);"><div style="font-size:12px; font-weight:700; margin-bottom:6px; color:var(--accent);">法人 vs 個人事業主</div><div style="position:relative; height:200px;"><canvas id="area-chart-' + idx + '-corp"></canvas></div></div>' +
+        '<div class="chart-box"><div style="font-size:12px; font-weight:700; margin-bottom:6px; color:var(--accent);">事業所規模別分布</div><div class="chart-canvas-wrap"><canvas id="area-chart-' + idx + '-scale"></canvas></div></div>' +
+        '<div class="chart-box"><div style="font-size:12px; font-weight:700; margin-bottom:6px; color:var(--accent);">法人 vs 個人事業主</div><div class="chart-canvas-wrap"><canvas id="area-chart-' + idx + '-corp"></canvas></div></div>' +
         '</div>' +
-        '<div style="background:rgba(30,41,59,0.5); border-radius:12px; padding:16px; border:1px solid rgba(139,92,246,0.1); margin-top:12px;"><div style="font-size:12px; font-weight:700; margin-bottom:6px; color:var(--accent);">士業種別内訳</div><div style="position:relative; height:200px;"><canvas id="area-chart-' + idx + '-shigyo-breakdown"></canvas></div></div>' +
+        '<div class="chart-box" style="margin-top:10px;"><div style="font-size:12px; font-weight:700; margin-bottom:6px; color:var(--accent);">士業種別内訳</div><div class="chart-canvas-wrap"><canvas id="area-chart-' + idx + '-shigyo-breakdown"></canvas></div></div>' +
         '</div>';
       html += '</div>';
     });
