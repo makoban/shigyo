@@ -1,5 +1,5 @@
 // ========================================
-// AI士業エリア分析 v1.0 — 士業特化版
+// AI士業エリア分析 v2.0 — 士業特化版
 // Cloudflare Workers Proxy経由でGemini API + e-Stat API
 // URL入力 + エリア名入力（都道府県・市区町村）対応
 // ========================================
@@ -29,7 +29,8 @@ var SHIGYO_CONFIG = {
     business_establishments: { total_establishments: 0, total_employees: 0, corporations: 0, sole_proprietors: 0, small_scale_1_4: 0, medium_scale_5_29: 0, large_scale_30_plus: 0, source: '推計' },
     turnover: { new_establishments_1yr: 0, closed_establishments_1yr: 0, opening_rate_pct: 0, closure_rate_pct: 0, net_increase: 0, new_corporations_1yr: 0, bankruptcy_count: 0 },
     shigyo_competition: { tax_accountant_offices: 0, lawyer_offices: 0, judicial_scrivener_offices: 0, labor_consultant_offices: 0, administrative_scrivener_offices: 0, other_professional_offices: 0, total_shigyo_offices: 0, shigyo_per_1000_establishments: 0 },
-    potential: { target_establishments: 0, target_sole_proprietors: 0, potential_clients_per_shigyo: 0, market_size_estimate: 0, growth_index: 0, ai_insight: '' }
+    national_comparison: { national_avg_opening_rate: 0, national_avg_closure_rate: 0, national_avg_shigyo_density: 0, national_avg_sole_proprietor_ratio: 0, national_avg_potential_clients_per_shigyo: 0, national_avg_growth_index: 0, area_vs_national_opening_rate: 'average', area_vs_national_closure_rate: 'average', area_vs_national_shigyo_density: 'average', area_vs_national_sole_proprietor_ratio: 'average' },
+    potential: { target_establishments: 0, target_sole_proprietors: 0, potential_clients_per_shigyo: 0, market_size_estimate: 0, growth_index: 0, ai_insight: '', target_client_profile: '', marketing_strategy: '', competitive_advantage: '' }
   }
 };
 
@@ -750,7 +751,22 @@ function buildShigyoMarketPrompt(analysis, estatData, area) {
     '    "startup_demand_index": "創業支援需要指数(開業率ベース、全国平均=100)",\n' +
     '    "market_size_estimate": "エリア内士業市場規模推計(万円)",\n' +
     '    "growth_index": "成長性指数(全国平均=100)",\n' +
-    '    "ai_insight": "このエリアでの士業事務所の営業戦略に関する具体的な提言。潜在顧客の特徴、ターゲット業種、開拓手法を含め、数値データを引用しながら250字以内で述べてください。"\n' +
+    '    "ai_insight": "このエリアでの士業事務所の営業戦略に関する具体的な提言。①潜在顧客の特徴と規模、②全国平均との比較で見えるこのエリアの強み/弱み、③具体的なターゲット業種と開拓手法、④競合との差別化ポイントを、数値データを引用しながら500字以内で述べてください。",\n' +
+    '    "target_client_profile": "このエリアで最も有望な理想的顧客像を具体的に描写。業種・規模・課題・ニーズを含め200字以内で述べてください。",\n' +
+    '    "marketing_strategy": "このエリアでの効果的な集客・マーケティング戦略。オンライン/オフライン施策、紹介ルート構築、セミナー戦略等を数値根拠と共に200字以内で述べてください。",\n' +
+    '    "competitive_advantage": "このエリアで競合士業と差別化するための具体的戦略。専門特化、価格戦略、サービス品質、DX活用等を200字以内で述べてください。"\n' +
+    '  },\n' +
+    '  "national_comparison": {\n' +
+    '    "national_avg_opening_rate": "全国平均開業率(%、例: 4.4)",\n' +
+    '    "national_avg_closure_rate": "全国平均廃業率(%、例: 3.5)",\n' +
+    '    "national_avg_shigyo_density": "全国平均の事業所1000あたり士業数(例: 8.5)",\n' +
+    '    "national_avg_sole_proprietor_ratio": "全国平均の個人事業主比率(%、例: 25)",\n' +
+    '    "national_avg_potential_clients_per_shigyo": "全国平均の士業1事務所あたり潜在顧客数(例: 120)",\n' +
+    '    "national_avg_growth_index": "全国平均の成長性指数(=100)",\n' +
+    '    "area_vs_national_opening_rate": "above/below/average（このエリアの開業率が全国平均と比べて）",\n' +
+    '    "area_vs_national_closure_rate": "above/below/average（廃業率）",\n' +
+    '    "area_vs_national_shigyo_density": "above/below/average（士業密度）",\n' +
+    '    "area_vs_national_sole_proprietor_ratio": "above/below/average（個人事業主比率）"\n' +
     '  }\n' +
     '}';
 }
@@ -775,7 +791,17 @@ function buildShigyoCrossAreaPrompt(analysis, marketsData) {
     '  "strategic_summary": "具体的な数値データを引用しながら全体の出店・営業戦略を述べる(300字以内)",\n' +
     '  "sales_advice": "数値に基づく顧客獲得・営業アドバイス(200字以内)",\n' +
     '  "risk_areas": "リスクのあるエリアと数値的根拠(150字以内)",\n' +
-    '  "growth_areas": "成長が見込めるエリアと数値的根拠(150字以内)"\n' +
+    '  "growth_areas": "成長が見込めるエリアと数値的根拠(150字以内)",\n' +
+    '  "detailed_area_comparison": [\n' +
+    '    {\n' +
+    '      "area": "エリア名",\n' +
+    '      "establishment_density_score": "事業所密度スコア(0-100)",\n' +
+    '      "shigyo_competition_score": "士業競合度スコア(0-100、低いほど競合少なく良い)",\n' +
+    '      "growth_score": "成長性スコア(0-100)",\n' +
+    '      "potential_client_score": "潜在顧客規模スコア(0-100)",\n' +
+    '      "cost_efficiency_score": "コスト効率スコア(0-100)"\n' +
+    '    }\n' +
+    '  ]\n' +
     '}';
 }
 
@@ -958,9 +984,65 @@ function buildComparisonTable(markets) {
   return html;
 }
 
+// ---- 全国平均比較バッジ ----
+function buildNationalComparisonBadge(areaValue, nationalAvg, higherIsPositive) {
+  if (!areaValue || !nationalAvg || nationalAvg === 0) return '';
+  var diff = areaValue - nationalAvg;
+  var pct = ((diff / nationalAvg) * 100).toFixed(1);
+  var threshold = nationalAvg * 0.05; // 5%以内は「平均並」
+  if (Math.abs(diff) <= threshold) {
+    return ' <span style="display:inline-flex; align-items:center; gap:2px; font-size:10px; font-weight:700; color:#94a3b8; background:rgba(148,163,184,0.1); padding:2px 8px; border-radius:10px;">— 全国並</span>';
+  }
+  var isAbove = diff > 0;
+  var isPositive = (isAbove && higherIsPositive) || (!isAbove && !higherIsPositive);
+  var color = isPositive ? '#10b981' : '#f43f5e';
+  var bg = isPositive ? 'rgba(16,185,129,0.1)' : 'rgba(244,63,94,0.1)';
+  var arrow = isAbove ? '▲' : '▼';
+  var label = isAbove ? '+' + pct + '%' : pct + '%';
+  return ' <span style="display:inline-flex; align-items:center; gap:2px; font-size:10px; font-weight:700; color:' + color + '; background:' + bg + '; padding:2px 8px; border-radius:10px;">' + arrow + ' ' + label + '</span>';
+}
+
+// ---- 全国平均比較カード ----
+function buildNationalComparisonCard(marketData) {
+  var nc = marketData.national_comparison;
+  if (!nc) return '';
+  var tn = marketData.turnover || {};
+  var sc = marketData.shigyo_competition || {};
+  var be = marketData.business_establishments || {};
+  var pot = marketData.potential || {};
+  var items = [
+    { label: '開業率', areaVal: tn.opening_rate_pct, natVal: nc.national_avg_opening_rate, unit: '%', higherIsPositive: true },
+    { label: '廃業率', areaVal: tn.closure_rate_pct, natVal: nc.national_avg_closure_rate, unit: '%', higherIsPositive: false },
+    { label: '士業密度(/1000事業所)', areaVal: sc.shigyo_per_1000_establishments, natVal: nc.national_avg_shigyo_density, unit: '', higherIsPositive: false },
+    { label: '個人事業主比率', areaVal: (be.sole_proprietors && be.total_establishments) ? ((be.sole_proprietors / be.total_establishments) * 100).toFixed(1) : 0, natVal: nc.national_avg_sole_proprietor_ratio, unit: '%', higherIsPositive: true }
+  ];
+  var html = '<div style="margin-bottom:16px;"><div style="font-size:14px; font-weight:700; margin-bottom:10px;">🏁 全国平均との比較</div>';
+  items.forEach(function(item) {
+    var areaVal = parseFloat(item.areaVal) || 0;
+    var natVal = parseFloat(item.natVal) || 0;
+    if (natVal === 0) return;
+    var maxVal = Math.max(areaVal, natVal) * 1.3;
+    if (maxVal === 0) maxVal = 1;
+    var areaPct = Math.min((areaVal / maxVal) * 100, 100);
+    var natPct = Math.min((natVal / maxVal) * 100, 100);
+    var badge = buildNationalComparisonBadge(areaVal, natVal, item.higherIsPositive);
+    html += '<div style="margin-bottom:10px; padding:8px 12px; background:rgba(0,0,0,0.15); border-radius:8px;">' +
+      '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;"><span style="font-size:11px; font-weight:600; color:var(--text-secondary);">' + item.label + badge + '</span></div>' +
+      '<div style="display:flex; align-items:center; gap:6px; margin-bottom:3px;"><span style="font-size:10px; color:var(--accent); min-width:50px;">エリア</span><div style="flex:1; background:rgba(255,255,255,0.05); border-radius:3px; height:12px; overflow:hidden;"><div style="width:' + areaPct + '%; height:100%; background:var(--accent-gradient); border-radius:3px;"></div></div><span style="font-size:11px; font-weight:700; color:var(--text-primary); min-width:48px; text-align:right;">' + areaVal + item.unit + '</span></div>' +
+      '<div style="display:flex; align-items:center; gap:6px;"><span style="font-size:10px; color:var(--text-muted); min-width:50px;">全国平均</span><div style="flex:1; background:rgba(255,255,255,0.05); border-radius:3px; height:12px; overflow:hidden;"><div style="width:' + natPct + '%; height:100%; background:rgba(148,163,184,0.4); border-radius:3px;"></div></div><span style="font-size:11px; font-weight:500; color:var(--text-muted); min-width:48px; text-align:right;">' + natVal + item.unit + '</span></div>' +
+      '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
 // ---- 士業データセクション ----
 function renderShigyoDataSections(marketData) {
   var html = '';
+  var nc = marketData.national_comparison || {};
+
+  // 全国平均比較カード（先頭に配置）
+  html += buildNationalComparisonCard(marketData);
 
   if (marketData.business_establishments) {
     var be = marketData.business_establishments;
@@ -985,8 +1067,8 @@ function renderShigyoDataSections(marketData) {
     html += '<div style="margin-bottom:16px;"><div style="font-size:14px; font-weight:700; margin-bottom:8px;">📈 開廃業動向</div><div class="stat-grid">' +
       '<div class="stat-box"><div class="stat-box__value">' + formatNumber(tn.new_establishments_1yr) + '<span style="font-size:14px">件/年</span></div><div class="stat-box__label">新設事業所数</div></div>' +
       '<div class="stat-box"><div class="stat-box__value">' + formatNumber(tn.closed_establishments_1yr) + '<span style="font-size:14px">件/年</span></div><div class="stat-box__label">廃業事業所数</div></div>' +
-      '<div class="stat-box"><div class="stat-box__value">' + (tn.opening_rate_pct || '—') + '<span style="font-size:14px">%</span></div><div class="stat-box__label">開業率</div></div>' +
-      '<div class="stat-box"><div class="stat-box__value">' + (tn.closure_rate_pct || '—') + '<span style="font-size:14px">%</span></div><div class="stat-box__label">廃業率</div></div>' +
+      '<div class="stat-box"><div class="stat-box__value">' + (tn.opening_rate_pct || '—') + '<span style="font-size:14px">%</span></div><div class="stat-box__label">開業率' + buildNationalComparisonBadge(tn.opening_rate_pct, nc.national_avg_opening_rate, true) + '</div></div>' +
+      '<div class="stat-box"><div class="stat-box__value">' + (tn.closure_rate_pct || '—') + '<span style="font-size:14px">%</span></div><div class="stat-box__label">廃業率' + buildNationalComparisonBadge(tn.closure_rate_pct, nc.national_avg_closure_rate, false) + '</div></div>' +
       '</div><div class="stat-grid" style="margin-top:8px;">' +
       '<div class="stat-box"><div class="stat-box__value" style="color:' + (tn.net_increase >= 0 ? '#10b981' : '#f43f5e') + ';">' + (tn.net_increase >= 0 ? '+' : '') + formatNumber(tn.net_increase) + '<span style="font-size:14px">件</span></div><div class="stat-box__label">純増減数</div></div>' +
       '<div class="stat-box"><div class="stat-box__value">' + formatNumber(tn.new_corporations_1yr) + '<span style="font-size:14px">社/年</span></div><div class="stat-box__label">新設法人数</div></div>' +
@@ -1005,7 +1087,7 @@ function renderShigyoDataSections(marketData) {
       '<div class="stat-box"><div class="stat-box__value">' + formatNumber(sc.administrative_scrivener_offices) + '<span style="font-size:14px">件</span></div><div class="stat-box__label">行政書士事務所</div></div>' +
       '<div class="stat-box"><div class="stat-box__value">' + formatNumber(sc.cpa_offices || 0) + '<span style="font-size:14px">件</span></div><div class="stat-box__label">公認会計士事務所</div></div>' +
       '<div class="stat-box" style="border:2px solid rgba(139,92,246,0.3);"><div class="stat-box__value" style="color:#8b5cf6;">' + formatNumber(sc.total_shigyo_offices) + '<span style="font-size:14px">件</span></div><div class="stat-box__label">士業事務所合計</div></div>' +
-      '<div class="stat-box"><div class="stat-box__value">' + (sc.shigyo_per_1000_establishments || '—') + '</div><div class="stat-box__label">事業所1000あたり士業数</div></div>' +
+      '<div class="stat-box"><div class="stat-box__value">' + (sc.shigyo_per_1000_establishments || '—') + '</div><div class="stat-box__label">事業所1000あたり士業数' + buildNationalComparisonBadge(sc.shigyo_per_1000_establishments, nc.national_avg_shigyo_density, false) + '</div></div>' +
       '</div></div>';
   }
 
@@ -1023,6 +1105,18 @@ function renderShigyoDataSections(marketData) {
       '</div>';
     if (pot.ai_insight) {
       html += '<div class="summary-box" style="margin-top:10px"><div class="summary-box__title">📌 AIからの営業戦略提言</div><div class="summary-box__text">' + escapeHtml(pot.ai_insight) + '</div></div>';
+    }
+    // 新AI分析カード3種
+    var aiCards = [];
+    if (pot.target_client_profile) aiCards.push({ icon: '👤', title: '理想的な顧客像', text: pot.target_client_profile, bg: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(5,150,105,0.1))', border: 'rgba(16,185,129,0.3)', color: '#10b981' });
+    if (pot.marketing_strategy) aiCards.push({ icon: '📣', title: 'マーケティング戦略', text: pot.marketing_strategy, bg: 'linear-gradient(135deg, rgba(249,115,22,0.1), rgba(245,158,11,0.1))', border: 'rgba(249,115,22,0.3)', color: '#f97316' });
+    if (pot.competitive_advantage) aiCards.push({ icon: '🏆', title: '差別化戦略', text: pot.competitive_advantage, bg: 'linear-gradient(135deg, rgba(59,130,246,0.1), rgba(99,102,241,0.1))', border: 'rgba(59,130,246,0.3)', color: '#3b82f6' });
+    if (aiCards.length > 0) {
+      html += '<div class="insight-grid" style="margin-top:12px;">';
+      aiCards.forEach(function(card) {
+        html += '<div style="background:' + card.bg + '; border:1px solid ' + card.border + '; border-radius:12px; padding:16px;"><div style="font-size:13px; font-weight:700; margin-bottom:8px; color:' + card.color + ';">' + card.icon + ' ' + card.title + '</div><div style="font-size:12px; color:var(--text-secondary); line-height:1.7;">' + escapeHtml(card.text) + '</div></div>';
+      });
+      html += '</div>';
     }
     html += '</div>';
   }
@@ -1068,6 +1162,9 @@ function renderResults(data) {
     html += '<div class="chart-grid"><div style="background:rgba(30,41,59,0.5); border-radius:12px; padding:16px; border:1px solid rgba(139,92,246,0.1);"><div style="font-size:13px; font-weight:700; margin-bottom:8px;">📈 事業所数 × 開業率</div><div style="position:relative; height:220px;"><canvas id="chart-est-opening"></canvas></div></div>' +
       '<div style="background:rgba(30,41,59,0.5); border-radius:12px; padding:16px; border:1px solid rgba(139,92,246,0.1);"><div style="font-size:13px; font-weight:700; margin-bottom:8px;">📊 士業事務所数 × 潜在顧客/士業</div><div style="position:relative; height:220px;"><canvas id="chart-shigyo-potential"></canvas></div></div></div>';
 
+    // 積み上げ棒グラフ: 開業 vs 廃業
+    html += '<div style="background:rgba(30,41,59,0.5); border-radius:12px; padding:16px; border:1px solid rgba(139,92,246,0.1); margin-bottom:20px;"><div style="font-size:13px; font-weight:700; margin-bottom:8px;">📊 開業 vs 廃業（エリア比較）</div><div style="position:relative; height:' + Math.max(180, markets.length * 50) + 'px;"><canvas id="chart-stacked-turnover"></canvas></div></div>';
+
     if (cross.opportunity_ranking && cross.opportunity_ranking.length > 0) {
       html += '<div style="margin-bottom:20px;"><div style="font-size:15px; font-weight:700; margin-bottom:12px;">🏆 出店チャンスランキング</div>';
       var colors = ['#8b5cf6','#6366f1','#10b981','#f59e0b','#f97316','#3b82f6'];
@@ -1090,6 +1187,25 @@ function renderResults(data) {
       });
       html += '</div>';
     }
+
+    // 5次元エリア比較（detailed_area_comparison）
+    if (cross.detailed_area_comparison && cross.detailed_area_comparison.length > 0) {
+      html += '<div style="margin-top:20px;"><div style="font-size:15px; font-weight:700; margin-bottom:12px;">📊 5次元エリア比較</div>';
+      var dimLabels = { establishment_density_score: '事業所密度', shigyo_competition_score: '士業競合度（低=良）', growth_score: '成長性', potential_client_score: '潜在顧客規模', cost_efficiency_score: 'コスト効率' };
+      var dimColors = { establishment_density_score: '#8b5cf6', shigyo_competition_score: '#f43f5e', growth_score: '#10b981', potential_client_score: '#3b82f6', cost_efficiency_score: '#f59e0b' };
+      cross.detailed_area_comparison.forEach(function(ac) {
+        html += '<div style="background:rgba(30,41,59,0.4); border-radius:12px; padding:14px 16px; margin-bottom:10px; border:1px solid rgba(139,92,246,0.08);"><div style="font-size:13px; font-weight:700; margin-bottom:10px;">📍 ' + escapeHtml(ac.area || '') + '</div>';
+        var dims = ['establishment_density_score', 'shigyo_competition_score', 'growth_score', 'potential_client_score', 'cost_efficiency_score'];
+        dims.forEach(function(dim) {
+          var val = parseInt(ac[dim]) || 0;
+          var col = dimColors[dim] || '#8b5cf6';
+          html += '<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><span style="font-size:11px; color:var(--text-muted); min-width:110px; text-align:right;">' + dimLabels[dim] + '</span><div style="flex:1; background:rgba(255,255,255,0.05); border-radius:4px; height:16px; overflow:hidden; position:relative;"><div style="width:' + val + '%; height:100%; background:' + col + '; border-radius:4px; transition:width 0.5s;"></div></div><span style="font-size:12px; font-weight:700; color:' + col + '; min-width:32px; text-align:right;">' + val + '</span></div>';
+        });
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
     html += '</div></div>';
   }
 
@@ -1120,6 +1236,14 @@ function renderResults(data) {
           '<div class="stat-box"><div class="stat-box__value">' + (pop.elderly_pct || '—') + '%</div><div class="stat-box__label">65歳以上</div></div></div></div>';
       }
       html += renderShigyoDataSections(m);
+      // エリア別チャート用canvas
+      html += '<div style="margin-top:16px;"><div style="font-size:14px; font-weight:700; margin-bottom:10px;">📊 データ可視化</div>' +
+        '<div class="chart-grid">' +
+        '<div style="background:rgba(30,41,59,0.5); border-radius:12px; padding:16px; border:1px solid rgba(139,92,246,0.1);"><div style="font-size:12px; font-weight:700; margin-bottom:6px; color:var(--accent);">事業所規模別分布</div><div style="position:relative; height:200px;"><canvas id="area-chart-' + idx + '-scale"></canvas></div></div>' +
+        '<div style="background:rgba(30,41,59,0.5); border-radius:12px; padding:16px; border:1px solid rgba(139,92,246,0.1);"><div style="font-size:12px; font-weight:700; margin-bottom:6px; color:var(--accent);">法人 vs 個人事業主</div><div style="position:relative; height:200px;"><canvas id="area-chart-' + idx + '-corp"></canvas></div></div>' +
+        '</div>' +
+        '<div style="background:rgba(30,41,59,0.5); border-radius:12px; padding:16px; border:1px solid rgba(139,92,246,0.1); margin-top:12px;"><div style="font-size:12px; font-weight:700; margin-bottom:6px; color:var(--accent);">士業種別内訳</div><div style="position:relative; height:200px;"><canvas id="area-chart-' + idx + '-shigyo-breakdown"></canvas></div></div>' +
+        '</div>';
       html += '</div>';
     });
     html += '</div>';
@@ -1127,7 +1251,12 @@ function renderResults(data) {
 
   resultsContent.innerHTML = html;
   if (markets.length > 0 && typeof Chart !== 'undefined') {
-    setTimeout(function() { renderSummaryCharts(markets); }, 100);
+    setTimeout(function() {
+      renderSummaryCharts(markets);
+      renderStackedBarChart(markets);
+      // 最初のエリアのチャートを描画
+      if (markets[0]) renderAreaCharts(markets[0].data || {}, 0);
+    }, 100);
   }
 }
 
@@ -1188,6 +1317,99 @@ function renderSummaryCharts(markets) {
   }
 }
 
+// ---- 積み上げ棒グラフ: 開業 vs 廃業（エリア比較） ----
+function renderStackedBarChart(markets) {
+  var ctx = document.getElementById('chart-stacked-turnover');
+  if (!ctx || typeof Chart === 'undefined') return;
+  var labels = markets.map(function(mkt) { return mkt.area ? mkt.area.label : 'エリア'; });
+  var newData = markets.map(function(mkt) { return ((mkt.data||{}).turnover||{}).new_establishments_1yr||0; });
+  var closedData = markets.map(function(mkt) { return -Math.abs(((mkt.data||{}).turnover||{}).closed_establishments_1yr||0); });
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: '新設事業所数', data: newData, backgroundColor: 'rgba(16,185,129,0.7)', borderRadius: 4 },
+        { label: '廃業事業所数', data: closedData, backgroundColor: 'rgba(244,63,94,0.7)', borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } }, tooltip: { callbacks: { label: function(c) { return c.dataset.label + ': ' + Math.abs(c.raw).toLocaleString() + '件'; } } } },
+      scales: {
+        x: { stacked: true, ticks: { color: '#94a3b8', font: { size: 10 }, callback: function(v) { return Math.abs(v) >= 10000 ? (Math.abs(v)/10000).toFixed(0)+'万' : Math.abs(v); } }, grid: { color: 'rgba(148,163,184,0.1)' } },
+        y: { stacked: true, ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ---- エリア別チャート（ドーナツ×2 + 横棒グラフ） ----
+var _areaChartInstances = {};
+function renderAreaCharts(marketData, areaIdx) {
+  var prefix = 'area-chart-' + areaIdx;
+  // 既存インスタンスを破棄
+  if (_areaChartInstances[prefix]) {
+    _areaChartInstances[prefix].forEach(function(c) { try { c.destroy(); } catch(e) {} });
+  }
+  _areaChartInstances[prefix] = [];
+
+  var be = marketData.business_establishments || {};
+  var sc = marketData.shigyo_competition || {};
+  var chartFont = '#94a3b8';
+
+  // ドーナツ1: 事業所規模別分布
+  var ctx1 = document.getElementById(prefix + '-scale');
+  if (ctx1 && (be.small_scale_1_4 || be.medium_scale_5_29 || be.large_scale_30_plus)) {
+    var c1 = new Chart(ctx1, {
+      type: 'doughnut',
+      data: {
+        labels: ['小規模(1-4人)', '中規模(5-29人)', '大規模(30人以上)'],
+        datasets: [{ data: [be.small_scale_1_4||0, be.medium_scale_5_29||0, be.large_scale_30_plus||0], backgroundColor: ['rgba(139,92,246,0.7)', 'rgba(99,102,241,0.7)', 'rgba(59,130,246,0.7)'], borderWidth: 0 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: chartFont, font: { size: 10 }, padding: 8 } } } }
+    });
+    _areaChartInstances[prefix].push(c1);
+  }
+
+  // ドーナツ2: 法人 vs 個人事業主
+  var ctx2 = document.getElementById(prefix + '-corp');
+  if (ctx2 && (be.corporations || be.sole_proprietors)) {
+    var c2 = new Chart(ctx2, {
+      type: 'doughnut',
+      data: {
+        labels: ['法人', '個人事業主'],
+        datasets: [{ data: [be.corporations||0, be.sole_proprietors||0], backgroundColor: ['rgba(16,185,129,0.7)', 'rgba(245,158,11,0.7)'], borderWidth: 0 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: chartFont, font: { size: 10 }, padding: 8 } } } }
+    });
+    _areaChartInstances[prefix].push(c2);
+  }
+
+  // 横棒グラフ: 士業種別内訳
+  var ctx3 = document.getElementById(prefix + '-shigyo-breakdown');
+  if (ctx3) {
+    var shigyoLabels = ['税理士', '弁護士', '司法書士', '社労士', '行政書士', '公認会計士'];
+    var shigyoVals = [sc.tax_accountant_offices||0, sc.lawyer_offices||0, sc.judicial_scrivener_offices||0, sc.labor_consultant_offices||0, sc.administrative_scrivener_offices||0, sc.cpa_offices||0];
+    var c3 = new Chart(ctx3, {
+      type: 'bar',
+      data: {
+        labels: shigyoLabels,
+        datasets: [{ label: '事務所数', data: shigyoVals, backgroundColor: ['rgba(139,92,246,0.7)', 'rgba(59,130,246,0.7)', 'rgba(16,185,129,0.7)', 'rgba(245,158,11,0.7)', 'rgba(244,63,94,0.7)', 'rgba(99,102,241,0.7)'], borderRadius: 4 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: chartFont, font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
+          y: { ticks: { color: chartFont, font: { size: 10 } }, grid: { display: false } }
+        }
+      }
+    });
+    _areaChartInstances[prefix].push(c3);
+  }
+}
+
 function switchAreaTab(idx) {
   var contents = document.querySelectorAll('.area-tab-content');
   contents.forEach(function(el) { el.style.display = 'none'; });
@@ -1199,6 +1421,10 @@ function switchAreaTab(idx) {
     if (btnIdx === idx) { btn.style.background = 'var(--accent-gradient)'; btn.style.color = '#fff'; btn.style.borderColor = 'transparent'; }
     else { btn.style.background = 'var(--bg-tertiary)'; btn.style.color = 'var(--text-secondary)'; btn.style.borderColor = 'rgba(139,92,246,0.15)'; }
   });
+  // 遅延レンダリング（display:none問題回避）
+  if (analysisData && analysisData.markets && analysisData.markets[idx] && typeof Chart !== 'undefined') {
+    setTimeout(function() { renderAreaCharts(analysisData.markets[idx].data || {}, idx); }, 50);
+  }
 }
 
 // ---- Excel Export ----
@@ -1234,7 +1460,15 @@ function exportExcel() {
     if (cross.strategic_summary) { s0.push(['▼ 営業戦略サマリー']); s0.push([cross.strategic_summary]); s0.push([]); }
     if (cross.sales_advice) { s0.push(['▼ 顧客獲得アドバイス']); s0.push([cross.sales_advice]); s0.push([]); }
     if (cross.growth_areas) { s0.push(['▼ 成長エリア']); s0.push([cross.growth_areas]); s0.push([]); }
-    if (cross.risk_areas) { s0.push(['▼ リスクエリア']); s0.push([cross.risk_areas]); }
+    if (cross.risk_areas) { s0.push(['▼ リスクエリア']); s0.push([cross.risk_areas]); s0.push([]); }
+    // 5次元比較テーブル
+    if (cross.detailed_area_comparison && cross.detailed_area_comparison.length > 0) {
+      s0.push(['▼ 5次元エリア比較']);
+      s0.push(['エリア', '事業所密度', '士業競合度', '成長性', '潜在顧客規模', 'コスト効率']);
+      cross.detailed_area_comparison.forEach(function(ac) {
+        s0.push([ac.area||'', ac.establishment_density_score||0, ac.shigyo_competition_score||0, ac.growth_score||0, ac.potential_client_score||0, ac.cost_efficiency_score||0]);
+      });
+    }
   }
   var ws0 = XLSX.utils.aoa_to_sheet(s0);
   ws0['!cols'] = [{wch:5},{wch:24},{wch:12},{wch:12},{wch:10},{wch:12},{wch:10},{wch:10},{wch:12},{wch:14}];
@@ -1315,6 +1549,27 @@ function exportExcel() {
     }
     if (m.potential && m.potential.ai_insight) {
       rows.push(['⑥ AIコメント']); rows.push([m.potential.ai_insight]);
+      rows.push([]);
+    }
+    // 全国平均比較セクション
+    if (m.national_comparison) {
+      var ncc = m.national_comparison;
+      rows.push(['⑦ 全国平均比較']);
+      rows.push(['指標', 'エリア値', '全国平均', '判定']);
+      rows.push(['開業率(%)', (m.turnover||{}).opening_rate_pct||0, ncc.national_avg_opening_rate||0, ncc.area_vs_national_opening_rate||'—']);
+      rows.push(['廃業率(%)', (m.turnover||{}).closure_rate_pct||0, ncc.national_avg_closure_rate||0, ncc.area_vs_national_closure_rate||'—']);
+      rows.push(['士業密度(/1000事業所)', (m.shigyo_competition||{}).shigyo_per_1000_establishments||0, ncc.national_avg_shigyo_density||0, ncc.area_vs_national_shigyo_density||'—']);
+      var solePct = ((m.business_establishments||{}).sole_proprietors && (m.business_establishments||{}).total_establishments) ? (((m.business_establishments||{}).sole_proprietors / (m.business_establishments||{}).total_establishments) * 100).toFixed(1) : 0;
+      rows.push(['個人事業主比率(%)', solePct, ncc.national_avg_sole_proprietor_ratio||0, ncc.area_vs_national_sole_proprietor_ratio||'—']);
+      rows.push([]);
+    }
+    // AI分析拡張セクション
+    if (m.potential) {
+      var pot2 = m.potential;
+      rows.push(['⑧ AI詳細分析']);
+      if (pot2.target_client_profile) { rows.push(['理想的な顧客像']); rows.push([pot2.target_client_profile]); rows.push([]); }
+      if (pot2.marketing_strategy) { rows.push(['マーケティング戦略']); rows.push([pot2.marketing_strategy]); rows.push([]); }
+      if (pot2.competitive_advantage) { rows.push(['差別化戦略']); rows.push([pot2.competitive_advantage]); }
     }
     var ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!cols'] = [{wch:28},{wch:35},{wch:12},{wch:20}];

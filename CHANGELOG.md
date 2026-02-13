@@ -1,5 +1,46 @@
 # CHANGELOG - AI士業エリア分析
 
+## v2.0 (2026-02-13)
+
+### 大幅ブラッシュアップ — グラフ充実・全国比較・AI深掘り
+
+#### Geminiプロンプト強化（Phase 1）
+- `buildShigyoMarketPrompt()`: JSON出力に `national_comparison` オブジェクト追加（全国平均開業率/廃業率/士業密度/個人事業主比率/潜在顧客数/成長指数 + above/below/average判定）
+- `potential.ai_insight` を250字→500字に拡張（数値引用+全国比較+競合分析を要求）
+- `potential` に3フィールド追加: `target_client_profile`（理想的な顧客像200字）、`marketing_strategy`（マーケティング戦略200字）、`competitive_advantage`（差別化戦略200字）
+- `buildShigyoCrossAreaPrompt()`: `detailed_area_comparison` 追加（5次元スコア: 事業所密度/士業競合度/成長性/潜在顧客規模/コスト効率）
+- `SHIGYO_CONFIG.marketJsonTemplate` に新フィールドを反映
+
+#### チャート4種追加（Phase 2）
+- **ドーナツチャート: 事業所規模別分布** — 小規模(1-4人)/中規模(5-29人)/大規模(30人以上)
+- **ドーナツチャート: 法人 vs 個人事業主** — corporations/sole_proprietors
+- **横棒グラフ: 士業種別内訳** — 税理士/弁護士/司法書士/社労士/行政書士/公認会計士
+- **積み上げ棒グラフ: 開業 vs 廃業（エリア比較）** — サマリーセクションに配置
+- エリアタブ切替時の遅延レンダリング対応（display:none問題回避）
+- `_areaChartInstances` でChart.jsインスタンス管理・再描画時の破棄処理
+
+#### 全国平均比較（Phase 3）
+- `buildNationalComparisonBadge()`: ▲緑（全国平均以上・良好）/ ▼赤（以下・要注意）/ — 灰（平均並）のバッジHTML生成
+- `buildNationalComparisonCard()`: プログレスバー形式で「エリア値 vs 全国平均」を視覚比較（開業率/廃業率/士業密度/個人事業主比率の4指標）
+- 開業率・廃業率・士業密度のstat-boxに全国比較バッジを自動付与
+
+#### AI分析表示強化（Phase 4）
+- `renderShigyoDataSections()`: 既存の `ai_insight` カードに加え3つの新カード追加
+  - 👤 理想的な顧客像（緑系カード）
+  - 📣 マーケティング戦略（橙系カード）
+  - 🏆 差別化戦略（青系カード）
+- `renderResults()`: 横断分析セクションに5次元エリア比較をプログレスバー形式で表示
+
+#### Excel出力強化（Phase 5）
+- エリア別シートに「⑦ 全国平均比較」セクション追加（指標/エリア値/全国平均/判定の4列テーブル）
+- エリア別シートに「⑧ AI詳細分析」セクション追加（顧客像・マーケティング・差別化の3フィールド）
+- サマリーシートに「5次元エリア比較」テーブル追加
+
+#### バージョン更新（Phase 6）
+- `app.js` / `index.html` / `style.css`: v1.0→v2.0
+
+---
+
 ## v1.0 (2026-02-13)
 
 ### 初回リリース
